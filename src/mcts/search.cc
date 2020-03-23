@@ -296,11 +296,13 @@ std::vector<std::string> Search::GetVerboseStats(Node* node) const {
     oss << "(Q: " << std::setw(8) << std::setprecision(5)
         << edge.GetQ(fpu, draw_score, /* logit_q= */ false) << ") ";
 
-    oss << "(U: " << std::setw(6) << std::setprecision(5) << edge.GetU(U_coeff, params_.GetAprilFactor())
+    oss << "(U: " << std::setw(6) << std::setprecision(5) << edge.GetU(U_coeff,
+                            params_.GetAprilFactor(), params_.GetAprilScale())
         << ") ";
 
     oss << "(Q+U: " << std::setw(8) << std::setprecision(5)
-        << edge.GetQ(fpu, draw_score, logit_q) + edge.GetU(U_coeff, params_.GetAprilFactor()) << ") ";
+        << edge.GetQ(fpu, draw_score, logit_q) + edge.GetU(U_coeff,
+                            params_.GetAprilFactor(), params_.GetAprilScale()) << ") ";
 
     oss << "(V: ";
     std::optional<float> v;
