@@ -371,13 +371,15 @@ class EdgeAndNode {
 
   // Edge related getters.
   float GetP() const { return edge_->GetP(); }
-  float GetPApril(float april_factor) const {
+  float GetPApril(float april_factor, float april_scale) const {
     return ((april_factor > 0.0) && (GetN() > 0))
       ? ( GetP() > 0.0f
 //          linear growth effect:
 //        ? 1.0f / (1.0f + (1.0f / GetP() - 1.0f) * FastExp(-april_factor * GetN()))
 //          logarithmic growth effect:
-        ? 1.0f / (1.0f + (1.0f / GetP() - 1.0f) / (1.0f + april_factor * GetN()))
+        ? 1.0f / (1.0f + (1.0f / GetP() - 1.0f) *
+                    FastPow(1.0f + april_factor * GetN(), -april_scale)
+                  )
         : 0.0f )
       : GetP() ; }
   Move GetMove(bool flip = false) const {
@@ -387,7 +389,7 @@ class EdgeAndNode {
   // Returns U = numerator * p / N.
   // Passed numerator is expected to be equal to (cpuct * sqrt(N[parent])).
   float GetU(float numerator, float april_factor) const {
-    return numerator * GetPApril(april_factor) / (1 + GetNStarted());
+    return numerator * GetPApril(april_factor, april_scale) / (1 + GetNStarted());
   }
 
   int GetVisitsToReachU(float target_score, float numerator, float default_q,
@@ -397,7 +399,7 @@ class EdgeAndNode {
     const auto n1 = GetNStarted() + 1;
     return std::max(
         1.0f,
-        std::min(std::floor(GetPApril(april_factor) * numerator / (target_score - q) - n1) + 1,
+        std::min(std::floor(GetPApril(april_factor, april_scale) * numerator / (target_score - q) - n1) + 1,
                  1e9f));
   }
 

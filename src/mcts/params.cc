@@ -61,6 +61,10 @@ const OptionId SearchParams::kAprilFactorId{
     "april-factor", "AprilFactor",
     "Decides how fast Policies will increase with number of Visits. "
     "Using CPuctFactor = 0 and CPuctFactorAtRoot = 0 is recommended."};
+const OptionId SearchParams::kAprilScaleId{
+    "april-scale", "AprilScale",
+    "Decides exponent of the policy growth term. "
+    "Using CPuctFactor = 0 and CPuctFactorAtRoot = 0 is recommended."};
 const OptionId SearchParams::kCpuctId{
     "cpuct", "CPuct",
     "cpuct_init constant from \"UCT search\" algorithm. Higher values promote "
@@ -256,6 +260,7 @@ void SearchParams::Populate(OptionsParser* options) {
   options->Add<IntOption>(kMaxPrefetchBatchId, 0, 1024) = 32;
   options->Add<BoolOption>(kLogitQId) = false;
   options->Add<FloatOption>(kAprilFactorId, 0.0f, 1.0f) = 0.0016f;
+  options->Add<FloatOption>(kAprilScaleId, 0.0f, 10.0f) = 1.0f;
   options->Add<FloatOption>(kCpuctId, 0.0f, 100.0f) = 1.33f;
   options->Add<FloatOption>(kCpuctAtRootId, 0.0f, 100.0f) = 1.33f;
   options->Add<FloatOption>(kCpuctBaseId, 1.0f, 1000000000.0f) = 18368.0f;
@@ -322,6 +327,7 @@ SearchParams::SearchParams(const OptionsDict& options)
     : options_(options),
       kLogitQ(options.Get<bool>(kLogitQId.GetId())),
       kAprilFactor(options.Get<float>(kAprilFactorId.GetId())),
+      kAprilScale(options.Get<float>(kAprilScaleId.GetId())),
       kCpuct(options.Get<float>(kCpuctId.GetId())),
       kCpuctAtRoot(
           options.Get<float>(options.Get<bool>(kRootHasOwnCpuctParamsId.GetId())

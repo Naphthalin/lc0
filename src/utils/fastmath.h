@@ -69,6 +69,11 @@ inline float FastPow2(const float a) {
   return out;
 }
 
+inline float FastPow(const float base, const float power) {
+  if (base <= 0.0) return 0.0;
+  return FastExp(FastLog(base) * power);
+}
+
 // Fast approximate ln(x). Does no range checking.
 inline float FastLog(const float a) {
   return 0.6931471805599453f * FastLog2(a);

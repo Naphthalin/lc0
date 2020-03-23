@@ -48,6 +48,7 @@ class SearchParams {
   }
   bool GetLogitQ() const { return kLogitQ; }
   float GetAprilFactor() const { return kAprilFactor; }
+  float GetAprilScale() const { return kAprilScale; }
   float GetCpuct(bool at_root) const { return at_root ? kCpuctAtRoot : kCpuct; }
   float GetCpuctBase(bool at_root) const {
     return at_root ? kCpuctBaseAtRoot : kCpuctBase;
@@ -121,6 +122,7 @@ class SearchParams {
   static const OptionId kMaxPrefetchBatchId;
   static const OptionId kLogitQId;
   static const OptionId kAprilFactorId;
+  static const OptionId kAprilScaleId;
   static const OptionId kCpuctId;
   static const OptionId kCpuctAtRootId;
   static const OptionId kCpuctBaseId;
@@ -176,6 +178,7 @@ class SearchParams {
   //            trivial search optimizations.
   const bool kLogitQ;
   const float kAprilFactor;
+  const float kAprilScale;
   const float kCpuct;
   const float kCpuctAtRoot;
   const float kCpuctBase;

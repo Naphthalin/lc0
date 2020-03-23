@@ -249,19 +249,23 @@ std::vector<std::string> Search::GetVerboseStats(Node* node) const {
       cpuct * std::sqrt(std::max(node->GetChildrenVisits(), 1u));
   const bool logit_q = params_.GetLogitQ();
   const float april_factor = params_.GetAprilFactor();
+  const float april_scale = params_.GetAprilScale();
 
   std::vector<EdgeAndNode> edges;
   for (const auto& edge : node->Edges()) edges.push_back(edge);
 
   std::sort(
       edges.begin(), edges.end(),
-      [&fpu, &U_coeff, &logit_q, &draw_score, &april_factor](EdgeAndNode a, EdgeAndNode b) {
+      [&fpu, &U_coeff, &logit_q, &draw_score, &april_factor, &april_scale]
+      (EdgeAndNode a, EdgeAndNode b) {
         return std::forward_as_tuple(
                    a.GetN(),
-                   a.GetQ(fpu, draw_score, logit_q) + a.GetU(U_coeff, april_factor)) <
+                   a.GetQ(fpu, draw_score, logit_q) +
+                        a.GetU(U_coeff, april_factor, april_scale)) <
                std::forward_as_tuple(
                    b.GetN(),
-                   b.GetQ(fpu, draw_score, logit_q) + b.GetU(U_coeff, april_factor));
+                   b.GetQ(fpu, draw_score, logit_q) +
+                        b.GetU(U_coeff, april_factor, april_scale));
       });
 
   std::vector<std::string> infos;
