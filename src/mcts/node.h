@@ -388,12 +388,12 @@ class EdgeAndNode {
 
   // Returns U = numerator * p / N.
   // Passed numerator is expected to be equal to (cpuct * sqrt(N[parent])).
-  float GetU(float numerator, float april_factor) const {
+  float GetU(float numerator, float april_factor, float april_scale) const {
     return numerator * GetPApril(april_factor, april_scale) / (1 + GetNStarted());
   }
 
   int GetVisitsToReachU(float target_score, float numerator, float default_q,
-                        float draw_score, bool logit_q, float april_factor) const {
+     float draw_score, bool logit_q, float april_factor, float april_factor) const {
     const auto q = GetQ(default_q, draw_score, logit_q);
     if (q >= target_score) return std::numeric_limits<int>::max();
     const auto n1 = GetNStarted() + 1;
