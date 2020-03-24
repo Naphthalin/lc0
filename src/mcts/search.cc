@@ -1024,7 +1024,8 @@ SearchWorker::NodeToProcess SearchWorker::PickNodeToExtend(
       }
 
       const float Q = child.GetQ(fpu, draw_score, params_.GetLogitQ());
-      const float score = child.GetU(puct_mult, params_.GetAprilFactor()) + Q + M;
+      const float score = child.GetU(puct_mult, params_.GetAprilFactor()
+                                     , params_.GetAprilScale()) + Q + M;
       if (score > best) {
         second_best = best;
         second_best_edge = best_edge;
@@ -1038,7 +1039,8 @@ SearchWorker::NodeToProcess SearchWorker::PickNodeToExtend(
 
     if (second_best_edge) {
       int estimated_visits_to_change_best = best_edge.GetVisitsToReachU(
-          second_best, puct_mult, fpu, draw_score, params_.GetLogitQ(), params_.GetAprilFactor());
+          second_best, puct_mult, fpu, draw_score, params_.GetLogitQ(),
+          params_.GetAprilFactor(), params_.GetAprilScale());
       // Only cache for n-2 steps as the estimate created by GetVisitsToReachU
       // has potential rounding errors and some conservative logic that can push
       // it up to 2 away from the real value.
@@ -1233,7 +1235,8 @@ int SearchWorker::PrefetchIntoCache(Node* node, int budget, bool is_odd_depth) {
     if (edge.GetP() == 0.0f) continue;
     // Flip the sign of a score to be able to easily sort.
     // TODO: should this use logit_q if set??
-    scores.emplace_back(-edge.GetU(puct_mult, params_.GetAprilFactor()) -
+    scores.emplace_back(-edge.GetU(puct_mult, params_.GetAprilFactor(),
+                                   params_.GetAprilScale()) -
                             edge.GetQ(fpu, draw_score, /* logit_q= */ false),
                         edge);
   }
@@ -1269,7 +1272,8 @@ int SearchWorker::PrefetchIntoCache(Node* node, int budget, bool is_odd_depth) {
       const float q = edge.GetQ(-fpu, draw_score, /* logit_q= */ false);
       if (next_score > q) {
         budget_to_spend =
-            std::min(budget, int(edge.GetPApril(params_.GetAprilFactor()) * puct_mult / (next_score - q) -
+            std::min(budget, int(edge.GetPApril(params_.GetAprilFactor(),
+                params_.GetAprilScale()) * puct_mult / (next_score - q) -
                                  edge.GetNStarted()) +
                                  1);
       } else {
