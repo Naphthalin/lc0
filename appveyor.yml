@@ -21,7 +21,7 @@ install:
 - cmd: IF %BLAS%==true IF NOT EXIST C:\cache\OpenBLAS appveyor DownloadFile https://sjeng.org/ftp/OpenBLAS-0.3.3-win-oldthread.zip
 - cmd: IF %BLAS%==true IF NOT EXIST C:\cache\OpenBLAS 7z x OpenBLAS-0.3.3-win-oldthread.zip -oC:\cache\OpenBLAS
 - cmd: IF %OPENCL%==true nuget install opencl-nug -Version 0.777.77 -OutputDirectory C:\cache
-- cmd: IF %BLAS%==true IF NOT EXIST C:\cache\ispc-v1.9.2-windows appveyor DownloadFile https://sourceforge.net/projects/ispcmirror/files/v1.9.2/ispc-v1.9.2-windows.zip
+- cmd: IF %BLAS%==true IF NOT EXIST C:\cache\ispc-v1.9.2-windows appveyor DownloadFile https://github.com/ispc/ispc/releases/download/v1.9.2/ispc-v1.9.2-windows.zip
 - cmd: IF %BLAS%==true IF NOT EXIST C:\cache\ispc-v1.9.2-windows 7z x ispc-v1.9.2-windows.zip -oC:\cache
 - cmd: IF %BLAS%==true set PATH=C:\cache\ispc-v1.9.2-windows;%PATH%
 - cmd: set "CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.0"
@@ -32,7 +32,7 @@ install:
 - cmd: IF %CUDA%==true IF NOT EXIST C:\cache\cuda appveyor DownloadFile http://developer.download.nvidia.com/compute/redist/cudnn/v7.4.2/cudnn-10.0-windows10-x64-v7.4.2.24.zip
 - cmd: IF %CUDA%==true IF NOT EXIST C:\cache\cuda 7z x cudnn-10.0-windows10-x64-v7.4.2.24.zip -oC:\cache
 - cmd: set PATH=C:\Python36;C:\Python36\scripts;%PATH%
-- cmd: pip3 install --upgrade meson
+- cmd: pip3 install --upgrade meson==0.51.2
 - cmd: call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat" amd64
 - cmd: set PKG_FOLDER="C:\cache"
 - cmd: IF NOT EXIST c:\cache\protobuf\ git clone -b v3.5.1 --single-branch --depth 1 https://github.com/google/protobuf.git
