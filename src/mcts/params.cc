@@ -94,6 +94,10 @@ const OptionId SearchParams::kRootHasOwnCpuctParamsId{
     "If enabled, cpuct parameters for root node are taken from *AtRoot "
     "parameters. Otherwise, they are the same as for the rest of nodes. "
     "Temporary flag for transition to a new version."};
+const OptionId SearchParams::kVirtualLossFactorId{
+    "virtual-loss-factor", "VirtualLossFactor",
+    "Interpolates assumed collision evaluations between no virtual loss and "
+    "full loss."};
 const OptionId SearchParams::kTwoFoldDrawsId{
     "two-fold-draws", "TwoFoldDraws",
     "Evaluates twofold repetitions in the search tree as draws. Visits to "
@@ -332,6 +336,7 @@ void SearchParams::Populate(OptionsParser* options) {
   options->Add<FloatOption>(kCpuctFactorId, 0.0f, 1000.0f) = 3.894f;
   options->Add<FloatOption>(kCpuctFactorAtRootId, 0.0f, 1000.0f) = 3.894f;
   options->Add<BoolOption>(kRootHasOwnCpuctParamsId) = false;
+  options->Add<FloatOption>(kVirtualLossFactorId, 0.0f, 1.0f) = 0.0f;
   options->Add<BoolOption>(kTwoFoldDrawsId) = true;
   options->Add<FloatOption>(kTemperatureId, 0.0f, 100.0f) = 0.0f;
   options->Add<IntOption>(kTempDecayMovesId, 0, 640) = 0;
@@ -433,6 +438,7 @@ SearchParams::SearchParams(const OptionsDict& options)
       kCpuctFactorAtRoot(options.Get<float>(
           options.Get<bool>(kRootHasOwnCpuctParamsId) ? kCpuctFactorAtRootId
                                                       : kCpuctFactorId)),
+      kVirtualLossFactor(options.Get<float>(kVirtualLossFactorId)),
       kTwoFoldDraws(options.Get<bool>(kTwoFoldDrawsId)),
       kNoiseEpsilon(options.Get<float>(kNoiseEpsilonId)),
       kNoiseAlpha(options.Get<float>(kNoiseAlphaId)),

@@ -449,11 +449,11 @@ class EdgeAndNode {
   }
 
   int GetVisitsToReachU(float target_score, float numerator,
-                        float score_without_u) const {
+                        float score_without_u, float loss_correction) const {
     if (score_without_u >= target_score) return std::numeric_limits<int>::max();
     const auto n1 = GetNStarted() + 1;
     return std::max(1.0f,
-                    std::min(std::floor(GetP() * numerator /
+                    std::min(std::floor((GetP() * numerator + loss_correction * n1)/
                                             (target_score - score_without_u) -
                                         n1) +
                                  1,
