@@ -341,7 +341,7 @@ float Search::GetDrawScore(bool is_odd_depth) const {
               ? params_.GetWhiteDrawDelta()
               : params_.GetBlackDrawDelta());
 }
-
+// REFACTOR::SEARCH
 namespace {
 inline float GetFpu(const SearchParams& params, Node* node, bool is_root_node,
                     float draw_score) {
@@ -351,7 +351,7 @@ inline float GetFpu(const SearchParams& params, Node* node, bool is_root_node,
              : -node->GetQ(-draw_score) -
                    value * std::sqrt(node->GetVisitedPolicy());
 }
-
+// REFACTOR::SEARCH
 // Faster version for if visited_policy is readily available already.
 inline float GetFpu(const SearchParams& params, Node* node, bool is_root_node,
                     float draw_score, float visited_pol) {
@@ -360,7 +360,7 @@ inline float GetFpu(const SearchParams& params, Node* node, bool is_root_node,
              ? value
              : -node->GetQ(-draw_score) - value * std::sqrt(visited_pol);
 }
-
+// REFACTOR::SEARCH
 inline float ComputeCpuct(const SearchParams& params, uint32_t N,
                           bool is_root_node) {
   const float init = params.GetCpuct(is_root_node);
@@ -369,7 +369,7 @@ inline float ComputeCpuct(const SearchParams& params, uint32_t N,
   return init + (k ? k * FastLog((N + base) / base) : 0.0f);
 }
 }  // namespace
-
+// REFACTOR::SEARCH
 std::vector<std::string> Search::GetVerboseStats(Node* node) const {
   assert(node == root_node_ || node->GetParent() == root_node_);
   const bool is_root = (node == root_node_);
@@ -656,6 +656,7 @@ std::vector<EdgeAndNode> Search::GetBestChildrenNoTemperature(Node* parent,
   const auto middle = (static_cast<int>(edges.size()) > count)
                           ? edges.begin() + count
                           : edges.end();
+  // REFACTOR::LCB
   std::partial_sort(
       edges.begin(), middle, edges.end(),
       [draw_score](const auto& a, const auto& b) {
@@ -852,6 +853,7 @@ void Search::PopulateCommonIterationStats(IterationStats* stats) {
   // If root node hasn't finished first visit, none of this code is safe.
   if (root_node_->GetN() > 0) {
     const auto draw_score = GetDrawScore(true);
+    // REFACTOR::SEARCH
     const float fpu =
         GetFpu(params_, root_node_, /* is_root_node */ true, draw_score);
     float max_q_plus_m = -1000;
@@ -1658,6 +1660,7 @@ void SearchWorker::PickNodesToExtendTask(Node* node, int base_depth,
         max_needed = std::min(max_needed, node->GetNStarted() + cur_limit + 2);
       }
       node->CopyPolicy(max_needed, current_pol.data());
+      // REFACTOR::SEARCH
       for (int i = 0; i < max_needed; i++) {
         current_util[i] = std::numeric_limits<float>::lowest();
       }
@@ -1751,7 +1754,8 @@ void SearchWorker::PickNodesToExtendTask(Node* node, int base_depth,
           }
         }
         int new_visits = 0;
-        if (second_best_edge) {
+        if (second_best_edge)
+          // REFACTOR::SEARCH
           int estimated_visits_to_change_best = std::numeric_limits<int>::max();
           if (best_without_u < second_best) {
             const auto n1 = current_nstarted[best_idx] + 1;
@@ -2075,6 +2079,7 @@ SearchWorker::NodeToProcess SearchWorker::PickNodeToExtend(
 
     // If we fall through, then n_in_flight_ has been incremented but this
     // playout remains incomplete; we must go deeper.
+    // REFACTOR::SEARCH
     const float cpuct = ComputeCpuct(params_, node->GetN(), is_root_node);
     const float puct_mult =
         cpuct * std::sqrt(std::max(node->GetChildrenVisits(), 1u));
@@ -2278,6 +2283,7 @@ int SearchWorker::PrefetchIntoCache(Node* node, int budget, bool is_odd_depth) {
   // Populate all subnodes and their scores.
   typedef std::pair<float, EdgeAndNode> ScoredEdge;
   std::vector<ScoredEdge> scores;
+  // REFACTOR::SEARCH
   const float cpuct =
       ComputeCpuct(params_, node->GetN(), node == search_->root_node_);
   const float puct_mult =
