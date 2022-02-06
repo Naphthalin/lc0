@@ -359,7 +359,8 @@ void Node::CalculateRelevanceBetamcts(const float trust, const float prior) {
       double child_relevance = winrate_child == 0.0 ? 0.0 :
             1.0f + FastErfLogistic( (logit_eval_child - logit_eval_parent)
             / sqrt(2.0 * (logit_var_child + logit_var_parent)));
-
+      if (child_relevance < 0.0) child_relevance = 0.0f;
+      if (child_relevance > 2.0) child_relevance = 2.0f;
       child.SetRBetamcts(child_relevance);
     }
   }

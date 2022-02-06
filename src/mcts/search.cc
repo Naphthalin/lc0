@@ -1837,7 +1837,8 @@ void SearchWorker::DoBackupUpdateSingleNode(
     }
     // When doing full betamcts score update, repeat until evals converge
     if (params_.GetBetamctsLevel() >= 1 &&
-        (n->GetNStarted() + 1 ) % params_.GetBetamctsUpdateInterval() == 0) {
+        (n->GetNStarted() + 1 ) % params_.GetBetamctsUpdateInterval() == 0
+         && (n->GetNStarted() > 100) ) {
       auto q_init = n->GetQBetamcts();
       n->FinalizeScoreUpdate(v, d, m, node_to_process.multivisit,
                            r * (float)node_to_process.multivisit,
