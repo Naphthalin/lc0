@@ -596,8 +596,8 @@ void Node::SortEdges() const {
   low_node_->SortEdges();
 }
 
-static constexpr float wld_tolerance = 0.00001f;
-static constexpr float m_tolerance = 0.00001f;
+static constexpr float wld_tolerance = 0.0001f;
+static constexpr float m_tolerance = 0.0001f;
 
 static bool WLDMInvariantsHold(float wl, float d, float m) {
   return -(1.0f + wld_tolerance) < wl && wl < (1.0f + wld_tolerance) &&  //
