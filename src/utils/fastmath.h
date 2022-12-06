@@ -89,7 +89,8 @@ inline float FastExp(const float a) { return FastExp2(1.442695040f * a); }
 inline float FastLogistic(const float a) {
   if (a > 20.0f) {return 1.0f;}
   if (a < -20.0f) {return 0.0f;}
-  return 1.0f / (1.0f + FastExp(-a));
+  // return 1.0f / (1.0f + FastExp(-a));
+  return 1.0f / (1.0f + std::exp(-a));
 }
 
 inline float FastSign(const float a) {
