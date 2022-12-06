@@ -199,7 +199,7 @@ namespace {
 inline void WDLRescale(float& v, float& d, float wdl_rescale_ratio,
                        float wdl_rescale_diff, float sign, bool invert) {
   if (invert) {
-    // wdl_rescale_diff = -wdl_rescale_diff;
+    wdl_rescale_diff = -wdl_rescale_diff;
     wdl_rescale_ratio = 1.0f / wdl_rescale_ratio;
   }
   auto w = (1 + v - d) / 2;
@@ -268,9 +268,9 @@ void Search::SendUciInfo() REQUIRES(nodes_mutex_) REQUIRES(counters_mutex_) {
     // Only the diff effect is inverted, so we only need to call if diff != 0.
     if (params_.GetPerspective() != "none" &&
         params_.GetWDLRescaleDiff() != 0) {
-      auto sign = ((params_.GetPerspective() == "auto") ||
-                   ((params_.GetPerspective() == "black") ==
-                    played_history_.IsBlackToMove()))
+      bool sign = (params_.GetPerspective() == "auto"
+                       ? !search_->played_history_.Last().IsBlackToMove()
+                       : (params_.GetPerspective() == "white"))
                       ? 1.0f
                       : -1.0f;
       WDLRescale(wl, floatD, params_.GetWDLRescaleRatio(),
@@ -1980,10 +1980,9 @@ void SearchWorker::FetchSingleNodeResult(NodeToProcess* node_to_process,
     if (is_tt_miss) {
       auto nn_eval = computation.GetNNEval(idx_in_computation).get();
       if (params_.GetPerspective() != "none") {
-        bool root_stm = (params_.GetPerspective() == "auto")
-                            ? true
-                            : ((params_.GetPerspective() == "black") ==
-                               search_->played_history_.Last().IsBlackToMove());
+        bool root_stm = (params_.GetPerspective() == "auto"
+                             ? !search_->played_history_.Last().IsBlackToMove()
+                             : (params_.GetPerspective() == "white"));
         auto sign = (root_stm ^ node_to_process->history.IsBlackToMove())
                         ? 1.0f
                         : -1.0f;
