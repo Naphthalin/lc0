@@ -101,10 +101,15 @@ class SearchParams {
   }
   bool GetDisplayCacheUsage() const { return kDisplayCacheUsage; }
   int GetMaxConcurrentSearchers() const { return kMaxConcurrentSearchers; }
+  std::string GetPerspective() const {
+    return options_.Get<std::string>(kPerspectiveId);
+  }
   float GetSidetomoveDrawScore() const { return kDrawScoreSidetomove; }
   float GetOpponentDrawScore() const { return kDrawScoreOpponent; }
   float GetWhiteDrawDelta() const { return kDrawScoreWhite; }
   float GetBlackDrawDelta() const { return kDrawScoreBlack; }
+  float GetWDLRescaleRatio() const { return kWDLRescaleRatio; }
+  float GetWDLRescaleDiff() const { return kWDLRescaleDiff; }
   uint32_t GetMaxOutOfOrderEvals() const { return kMaxOutOfOrderEvals; }
   float GetNpsLimit() const { return kNpsLimit; }
 
@@ -179,10 +184,18 @@ class SearchParams {
   static const OptionId kMovesLeftSlopeId;
   static const OptionId kDisplayCacheUsageId;
   static const OptionId kMaxConcurrentSearchersId;
+  static const OptionId kPerspectiveId;
   static const OptionId kDrawScoreSidetomoveId;
   static const OptionId kDrawScoreOpponentId;
   static const OptionId kDrawScoreWhiteId;
   static const OptionId kDrawScoreBlackId;
+  static const OptionId kWDLRescaleRatioId;
+  static const OptionId kWDLRescaleDiffId;
+  static const OptionId kWDLContemptId;
+  static const OptionId kWDLContemptAttenuationId;
+  static const OptionId kWDLDrawRateTargetId;
+  static const OptionId kWDLDrawRateReferenceId;
+  static const OptionId kWDLBookExitBiasId;
   static const OptionId kMaxOutOfOrderEvalsId;
   static const OptionId kNpsLimitId;
   static const OptionId kTaskWorkersPerSearchWorkerId;
@@ -234,10 +247,13 @@ class SearchParams {
   const float kMovesLeftQuadraticFactor;
   const bool kDisplayCacheUsage;
   const int kMaxConcurrentSearchers;
+  const std::string kPerspective;
   const float kDrawScoreSidetomove;
   const float kDrawScoreOpponent;
   const float kDrawScoreWhite;
   const float kDrawScoreBlack;
+  float kWDLRescaleRatio;
+  float kWDLRescaleDiff;
   const int kMaxOutOfOrderEvals;
   const float kNpsLimit;
   const int kTaskWorkersPerSearchWorker;
