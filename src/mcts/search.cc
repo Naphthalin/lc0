@@ -268,9 +268,9 @@ void Search::SendUciInfo() REQUIRES(nodes_mutex_) REQUIRES(counters_mutex_) {
     // Only the diff effect is inverted, so we only need to call if diff != 0.
     if (params_.GetPerspective() != "none" &&
         params_.GetWDLRescaleDiff() != 0) {
-      bool sign = (params_.GetPerspective() == "auto"
+      auto sign = (params_.GetPerspective() == "auto"
                        ? !(played_history_.Last().IsBlackToMove())
-                       : !(played_history_.Last().IsBlackToMove()))
+                       : (params_.GetPerspective() == "white"))
                       ? 1.0f
                       : -1.0f;
       WDLRescale(wl, floatD, params_.GetWDLRescaleRatio(),
