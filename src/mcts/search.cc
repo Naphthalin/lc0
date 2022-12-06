@@ -269,7 +269,7 @@ void Search::SendUciInfo() REQUIRES(nodes_mutex_) REQUIRES(counters_mutex_) {
     if (params_.GetPerspective() != "none" &&
         params_.GetWDLRescaleDiff() != 0) {
       bool sign = (params_.GetPerspective() == "auto"
-                       ? !search_->played_history_.Last().IsBlackToMove()
+                       ? !(search_->played_history_.Last().IsBlackToMove())
                        : (params_.GetPerspective() == "white"))
                       ? 1.0f
                       : -1.0f;
@@ -1981,7 +1981,7 @@ void SearchWorker::FetchSingleNodeResult(NodeToProcess* node_to_process,
       auto nn_eval = computation.GetNNEval(idx_in_computation).get();
       if (params_.GetPerspective() != "none") {
         bool root_stm = (params_.GetPerspective() == "auto"
-                             ? !search_->played_history_.Last().IsBlackToMove()
+                             ? !(search_->played_history_.Last().IsBlackToMove())
                              : (params_.GetPerspective() == "white"));
         auto sign = (root_stm ^ node_to_process->history.IsBlackToMove())
                         ? 1.0f
