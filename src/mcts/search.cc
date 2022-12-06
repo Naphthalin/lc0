@@ -270,7 +270,7 @@ void Search::SendUciInfo() REQUIRES(nodes_mutex_) REQUIRES(counters_mutex_) {
         params_.GetWDLRescaleDiff() != 0) {
       bool sign = (params_.GetPerspective() == "auto"
                        ? !(played_history_.Last().IsBlackToMove())
-                       : (params_.GetPerspective() == "white"))
+                       : !(played_history_.Last().IsBlackToMove()))
                       ? 1.0f
                       : -1.0f;
       WDLRescale(wl, floatD, params_.GetWDLRescaleRatio(),
