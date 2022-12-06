@@ -269,7 +269,7 @@ void Search::SendUciInfo() REQUIRES(nodes_mutex_) REQUIRES(counters_mutex_) {
     if (params_.GetPerspective() != "none" &&
         params_.GetWDLRescaleDiff() != 0) {
       bool sign = (params_.GetPerspective() == "auto"
-                       ? !(search_->played_history_.Last().IsBlackToMove())
+                       ? !(played_history_.Last().IsBlackToMove())
                        : (params_.GetPerspective() == "white"))
                       ? 1.0f
                       : -1.0f;
