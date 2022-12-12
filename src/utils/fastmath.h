@@ -77,6 +77,13 @@ inline float FastLog(const float a) {
 // Fast approximate exp(x). Does only limited range checking.
 inline float FastExp(const float a) { return FastPow2(1.442695040f * a); }
 
+// Safeguarded fast logistic function, based on FastExp().
+inline float FastLogistic(const float a) {
+  if (a > 20.0f) {return 1.0f;}
+  if (a < -20.0f) {return 0.0f;}
+  return 1.0f / (1.0f + FastExp(-a));
+}
+
 // Fast approximation for a logistic replacement of std::erf for betamcts.
 inline float FastErfLogistic(const float a) {
   return 2.0f / (1.0f + FastExp(-a)) - 1.0f;
