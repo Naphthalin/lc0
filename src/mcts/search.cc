@@ -1790,8 +1790,8 @@ void SearchWorker::FetchSingleNodeResult(NodeToProcess* node_to_process,
   }
   // For NN results, we need to populate policy as well as value.
   // First the value...
-  auto v = -computation_.GetQVal(idx_in_computation);
-  auto d = computation_.GetDVal(idx_in_computation);
+  auto v = -computation_->GetQVal(idx_in_computation);
+  auto d = computation_->GetDVal(idx_in_computation);
   // Check whether root moves are from the set perspective.
   if (params_.GetPerspective() != "none") {
     bool root_stm = (params_.GetPerspective() == "auto")
