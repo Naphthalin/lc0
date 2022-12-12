@@ -293,6 +293,42 @@ const OptionId SearchParams::kDrawScoreWhiteId{
 const OptionId SearchParams::kDrawScoreBlackId{
     "draw-score-black", "DrawScoreBlack",
     "Adjustment, added to a draw score of a black player."};
+const OptionId SearchParams::kPerspectiveId{
+    "perspective", "Perspective",
+    "Affects the way asymmetric WDL parameters are applied. Default is 'auto' "
+    "for matches, use 'white' and 'black' for analysis. Use 'none' to "
+    "deactivate the WDL conversion."};
+const OptionId SearchParams::kWDLRescaleRatioId{
+    "wdl-rescale-ratio", "WDLRescaleRatio",
+    "Rescales the logistic WDL scale by the given ratio."};
+const OptionId SearchParams::kWDLRescaleDiffId{
+    "wdl-rescale-diff", "WDLRescaleDiff",
+    "Shifts the logistic WDL mean by diff in white's favor."};
+const OptionId SearchParams::kWDLContemptId{
+    "wdl-contempt", "WDLContempt",
+    "The simulated rating advantage for the WDL conversion."};
+const OptionId SearchParams::kWDLContemptAttenuationId{
+    "wdl-contempt-attenuation", "WDLContemptAttenuation",
+    "This scales the given Elo advantage used for contempt."};
+const OptionId SearchParams::kWDLEvalObjectivityId{
+    "wdl-eval-objectivity", "WDLEvalObjectivity",
+    "When calculating the centipawn eval output, decides how objective/"
+    "contempt influenced the reported eval should be. Value 0.0 reports the "
+    "internally used WDL values, 1.0 attempts an objective eval."};
+const OptionId SearchParams::kWDLDrawRateTargetId{
+    "wdl-draw-rate-target", "WDLDrawRateTarget",
+    "To define the accuracy of play, the target draw rate in equal "
+    "positions is used as a proxy."};
+const OptionId SearchParams::kWDLDrawRateReferenceId{
+    "wdl-draw-rate-reference", "WDLDrawRateReference",
+    "Set this to the draw rate predicted by the used neural network at "
+    "default settings. The accuracy rescaling is done relative to the "
+    "reference draw rate."};
+const OptionId SearchParams::kWDLBookExitBiasId{
+    "wdl-book-exit-bias", "WDLBookExitBias",
+    "The book exit bias used when measuring engine Elo. Value of startpos is "
+    "around 0.2, value of 50% white win is 1. Only relevant if target draw "
+    "rate is above 80%."};
 const OptionId SearchParams::kNpsLimitId{
     "nps-limit", "NodesPerSecondLimit",
     "An option to specify an upper limit to the nodes per second searched. The "
@@ -395,6 +431,16 @@ void SearchParams::Populate(OptionsParser* options) {
   options->Add<IntOption>(kDrawScoreOpponentId, -100, 100) = 0;
   options->Add<IntOption>(kDrawScoreWhiteId, -100, 100) = 0;
   options->Add<IntOption>(kDrawScoreBlackId, -100, 100) = 0;
+  std::vector<std::string> perspective = {"auto", "white", "black", "none"};
+  options->Add<ChoiceOption>(kPerspectiveId, perspective) = "auto";
+  options->Add<FloatOption>(kWDLRescaleRatioId, 1e-6f, 1e6f) = 1.0f;
+  options->Add<FloatOption>(kWDLRescaleDiffId, -100.0f, 100.0f) = 0.0f;
+  options->Add<FloatOption>(kWDLContemptId, -1000.0f, 1000.0f) = 0.0f;
+  options->Add<FloatOption>(kWDLContemptAttenuationId, -10.0f, 10.0f) = 1.0f;
+  options->Add<FloatOption>(kWDLEvalObjectivityId, 0.0f, 1.0f) = 1.0f;
+  options->Add<FloatOption>(kWDLDrawRateTargetId, 0.001f, 0.999f) = 0.5f;
+  options->Add<FloatOption>(kWDLDrawRateReferenceId, 0.001f, 0.999f) = 0.5f;
+  options->Add<FloatOption>(kWDLBookExitBiasId, -2.0f, 2.0f) = 0.65f;
   options->Add<FloatOption>(kNpsLimitId, 0.0f, 1e6f) = 0.0f;
   options->Add<IntOption>(kSolidTreeThresholdId, 1, 2000000000) = 100;
   options->Add<BoolOption>(kUseBetaUCBId) = false;
@@ -416,6 +462,12 @@ void SearchParams::Populate(OptionsParser* options) {
   options->HideOption(kTemperatureEndgameId);
   options->HideOption(kTemperatureWinpctCutoffId);
   options->HideOption(kTemperatureVisitOffsetId);
+  options->HideOption(kWDLRescaleRatioId);
+  options->HideOption(kWDLRescaleDiffId);
+  options->HideOption(kWDLContemptAttenuationId);
+  options->HideOption(kWDLEvalObjectivityId);
+  options->HideOption(kWDLDrawRateReferenceId);
+  options->HideOption(kWDLBookExitBiasId);
 }
 
 SearchParams::SearchParams(const OptionsDict& options)
@@ -472,6 +524,8 @@ SearchParams::SearchParams(const OptionsDict& options)
       kDrawScoreOpponent{options.Get<int>(kDrawScoreOpponentId) / 100.0f},
       kDrawScoreWhite{options.Get<int>(kDrawScoreWhiteId) / 100.0f},
       kDrawScoreBlack{options.Get<int>(kDrawScoreBlackId) / 100.0f},
+      kPerspective(options.Get<std::string>(kPerspectiveId)),
+      kWDLEvalObjectivity(options.Get<float>(kWDLEvalObjectivityId)),
       kMaxOutOfOrderEvals(std::max(
           1, static_cast<int>(options.Get<float>(kMaxOutOfOrderEvalsId) *
                               options.Get<int>(kMiniBatchSizeId)))),
@@ -483,6 +537,33 @@ SearchParams::SearchParams(const OptionsDict& options)
 	  kRENTSExplorationFactor(options.Get<float>(kRENTSExplorationFactorId)),
       kRENTSTemp(options.Get<float>(kRENTSTempId)),
       kPolicyCutoffFactor(options.Get<float>(kPolicyCutoffFactorId)) {
+  // Calculate ratio and diff for WDL conversion from the contempt settings,
+  // unless they are changed from their default values explicitly.
+  kWDLRescaleRatio = options.Get<float>(kWDLRescaleRatioId);
+  kWDLRescaleDiff = options.Get<float>(kWDLRescaleDiffId);
+  if (kWDLRescaleRatio == 1.0 && kWDLRescaleDiff == 0.0) {
+    float scale_target =
+        1.0f / std::log((1.0f + options.Get<float>(kWDLDrawRateTargetId)) /
+                        (1.0f - options.Get<float>(kWDLDrawRateTargetId)));
+    float scale_reference =
+        1.0f / std::log((1.0f + options.Get<float>(kWDLDrawRateReferenceId)) /
+                        (1.0f - options.Get<float>(kWDLDrawRateReferenceId)));
+    kWDLRescaleRatio = scale_target / scale_reference;
+    kWDLRescaleDiff =
+        scale_target / (scale_reference * scale_reference) /
+        (1.0f /
+             std::pow(
+                 std::cosh(0.5f * (1 - options.Get<float>(kWDLBookExitBiasId)) /
+                           scale_target),
+                 2) +
+         1.0f /
+             std::pow(
+                 std::cosh(0.5f * (1 + options.Get<float>(kWDLBookExitBiasId)) /
+                           scale_target),
+                 2)) *
+        std::log(10) / 200 * options.Get<float>(kWDLContemptId) *
+        options.Get<float>(kWDLContemptAttenuationId);
+  }
   if (std::max(std::abs(kDrawScoreSidetomove), std::abs(kDrawScoreOpponent)) +
           std::max(std::abs(kDrawScoreWhite), std::abs(kDrawScoreBlack)) >
       1.0f) {

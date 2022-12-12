@@ -187,6 +187,32 @@ void ApplyDirichletNoise(Node* node, float eps, double alpha) {
 }
 }  // namespace
 
+namespace {
+// WDL conversion formula based on random walk model.
+inline void WDLRescale(float& v, float& d, float wdl_rescale_ratio,
+                       float wdl_rescale_diff, float sign, bool invert) {
+  if (invert) {
+    wdl_rescale_diff = -wdl_rescale_diff;
+    wdl_rescale_ratio = 1.0f / wdl_rescale_ratio;
+  }
+  auto w = (1 + v - d) / 2;
+  auto l = (1 - v - d) / 2;
+  if (w > 0 && d > 0 && l > 0) {
+    auto a = FastLog(1 / l - 1);
+    auto b = FastLog(1 / w - 1);
+    auto s = 2 / (a + b);
+    auto mu = (a - b) / (a + b);
+    auto s_new = s * wdl_rescale_ratio;
+    if (invert) std::swap(s, s_new);
+    auto mu_new = mu + sign * s * s * wdl_rescale_diff;
+    auto w_new = FastLogistic((-1.0f + mu_new) / s_new);
+    auto l_new = FastLogistic((-1.0f - mu_new) / s_new);
+    v = w_new - l_new;
+    d = std::max(0.0f, 1.0f - w_new - l_new);
+  }
+}
+}  // namespace
+
 void Search::SendUciInfo() REQUIRES(nodes_mutex_) {
   const auto max_pv = params_.GetMultiPv();
   const auto edges = GetBestChildrenNoTemperature(root_node_, max_pv, 0);
@@ -230,9 +256,22 @@ void Search::SendUciInfo() REQUIRES(nodes_mutex_) {
     ++multipv;
     uci_infos.emplace_back(common_info);
     auto& uci_info = uci_infos.back();
-    const auto wl = edge.GetWL(default_wl, params_.GetBetamctsLevel() >= 2);
-    const auto d = edge.GetD(default_d);
-    const int w = static_cast<int>(std::round(500.0 * (1.0 + wl - d)));
+    auto wl = edge.GetWL(default_wl, params_.GetBetamctsLevel() >= 2);
+    auto floatD = edge.GetD(default_d);
+    auto wl_internal = wl;
+    auto d_internal = floatD;
+    // Only the diff effect is inverted, so we only need to call if diff != 0.
+    if (params_.GetPerspective() != "none" &&
+        params_.GetWDLRescaleDiff() != 0) {
+      auto sign = ((params_.GetPerspective() == "auto") ||
+                   ((params_.GetPerspective() == "black") ==
+                    played_history_.IsBlackToMove()))
+                      ? 1.0f
+                      : -1.0f;
+      WDLRescale(wl, floatD, params_.GetWDLRescaleRatio(),
+                 params_.GetWDLRescaleDiff() * params_.GetWDLEvalObjectivity(),
+                 sign, true);
+    }
     const auto q = edge.GetQ(default_q, draw_score,
                     params_.GetBetamctsLevel() >= 1);
     if (edge.IsTerminal() && wl != 0.0f) {
@@ -254,9 +293,19 @@ void Search::SendUciInfo() REQUIRES(nodes_mutex_) {
     } else if (score_type == "W-L") {
       uci_info.score = wl * 10000;
     }
-    const int l = static_cast<int>(std::round(500.0 * (1.0 - wl - d)));
-    // Using 1000-w-l instead of 1000*d for D score so that W+D+L add up to
-    // 1000.0.
+    auto w = std::max(
+        0,
+        static_cast<int>(std::round(500.0 * (1.0 + wl_internal - d_internal))));
+    auto l = std::max(
+        0,
+        static_cast<int>(std::round(500.0 * (1.0 - wl_internal - d_internal))));
+    // Using 1000-w-l so that W+D+L add up to 1000.0.
+    auto d = 1000 - w - l;
+    if (d < 0) {
+      w = std::min(1000, std::max(0, w + d / 2));
+      l = 1000 - w;
+      d = 0;
+    }
     uci_info.wdl = ThinkingInfo::WDL{w, 1000 - w - l, l};
     if (network_->GetCapabilities().has_mlh()) {
       uci_info.moves_left = static_cast<int>(
@@ -1741,8 +1790,23 @@ void SearchWorker::FetchSingleNodeResult(NodeToProcess* node_to_process,
   }
   // For NN results, we need to populate policy as well as value.
   // First the value...
-  node_to_process->v = -computation_->GetQVal(idx_in_computation);
-  node_to_process->d = computation_->GetDVal(idx_in_computation);
+  auto v = -computation.GetQVal(idx_in_computation);
+  auto d = computation.GetDVal(idx_in_computation);
+  // Check whether root moves are from the set perspective.
+  if (params_.GetPerspective() != "none") {
+    bool root_stm = (params_.GetPerspective() == "auto")
+                        ? true
+                        : ((params_.GetPerspective() == "black") ==
+                           search_->played_history_.Last().IsBlackToMove());
+    auto sign = (root_stm ^ (node_to_process->depth & 1)) ? 1.0f : -1.0f;
+    if (params_.GetWDLRescaleRatio() != 1.0f ||
+        params_.GetWDLRescaleDiff() != 0.0f) {
+      WDLRescale(v, d, params_.GetWDLRescaleRatio(),
+                 params_.GetWDLRescaleDiff(), sign, false);
+    }
+  }
+  node_to_process->v = v;
+  node_to_process->d = d;
   node_to_process->m = computation_->GetMVal(idx_in_computation);
   // ...and secondly, the policy data.
   // Calculate maximum first.
