@@ -1,6 +1,6 @@
 /*
   This file is part of Leela Chess Zero.
-  Copyright (C) 2018 The LCZero Authors
+  Copyright (C) 2020 The LCZero Authors
 
   Leela Chess is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -24,22 +24,14 @@
   terms of the respective license agreement, the licensors of this
   Program grant you additional permission to convey the resulting work.
 */
+
 #pragma once
 
-// Versioning is performed according to the standard at <https://semver.org/>
-// Creating a new version should be performed using scripts/bumpversion.py.
+#include "utils/optionsdict.h"
 
-#include <cstdint>
-#include <string>
-#include "version.inc"
-#include "build_id.h"
+namespace lczero {
 
-std::uint32_t GetVersionInt(int major = LC0_VERSION_MAJOR,
-                            int minor = LC0_VERSION_MINOR,
-                            int patch = LC0_VERSION_PATCH);
+std::unique_ptr<TimeManager> MakeSimpleTimeManager(
+    int64_t move_overhead, const OptionsDict& params);
 
-std::string GetVersionStr(int major = LC0_VERSION_MAJOR,
-                          int minor = LC0_VERSION_MINOR,
-                          int patch = LC0_VERSION_PATCH,
-                          const std::string& postfix = LC0_VERSION_POSTFIX,
-                          const std::string& build_id = BUILD_IDENTIFIER);
+}  // namespace lczero
