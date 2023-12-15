@@ -94,6 +94,10 @@ const OptionId kNnueOutputSharpnessId{
     "nnue-output-sharpness", "",
     "Store WDL_mu and sharpness into SF plain "
     "training data file."};
+const OptionId kNnueFrcFilterId{
+    "nnue-frc-filter", "",
+    "Do not generate SF training data for positions with castling that is not "
+    "valid for standard chess."};
 const OptionId kDeleteFilesId{"delete-files", "",
                               "Delete the input files after processing."};
 
@@ -460,11 +464,11 @@ std::string AsNnueStringDual(const Position& p, Move m, float q, float d,
   float s = 0.0f;
   float mu_score = 0.0f;
   if ((w > 0.001f) && (d > 0.001f) && (l > 0.001f)) {
-      float a = log(1 / l - 1);
-      float b = log(1 / w - 1);
-      s = 2 / (a + b);
-      mu_score = (a - b) / (a + b);
-    }
+    float a = log(1 / l - 1);
+    float b = log(1 / w - 1);
+    s = 2 / (a + b);
+    mu_score = (a - b) / (a + b);
+  }
   float centipawn_score = 90 * tan(1.5637541897 * q);
   float score = mu_score != 0.0f && std::abs(q) + d < 0.996f &&
                         (std::abs(mu_score) < 1.0f ||
@@ -479,6 +483,25 @@ std::string AsNnueStringDual(const Position& p, Move m, float q, float d,
   out << "result " << result << std::endl;
   out << "e" << std::endl;
   return out.str();
+}
+
+bool IsFRC(Position p) {
+  ChessBoard b = p.GetBoard();
+  ChessBoard::Castlings c = b.castlings();
+  if (c.no_legal_castle()) return false;
+  if ((c.we_can_00() || c.we_can_000()) &&
+      (b.kings() & b.ours()) != BoardSquare(ChessBoard::E1).as_board())
+    return true;
+  if ((c.they_can_00() || c.they_can_000()) &&
+      (b.kings() & b.theirs()) != BoardSquare(ChessBoard::E8).as_board())
+    return true;
+  if (c.queenside_rook() != ChessBoard::FILE_A &&
+      (c.we_can_000() || c.they_can_000()))
+    return true;
+  if (c.kingside_rook() != ChessBoard::FILE_H &&
+      (c.we_can_00() || c.they_can_00()))
+    return true;
+  return false;
 }
 
 std::string AsNnueString(const Position& p, Move m, float q, int result) {
@@ -506,6 +529,7 @@ struct ProcessFileFlags {
   bool nnue_best_score : 1;
   bool nnue_best_move : 1;
   bool nnue_output_sharpness : 1;
+  bool nnue_frc_filter : 1;
 };
 
 void ProcessFile(const std::string& file, SyzygyTablebase* tablebase,
@@ -1118,22 +1142,25 @@ void ProcessFile(const std::string& file, SyzygyTablebase* tablebase,
         for (int i = 0; i < fileContents.size(); i++) {
           auto chunk = fileContents[i];
           Position p = history.Last();
-          if (chunk.visits > 0) {
-            // Format is v6 and position is evaluated.
-            Move m = MoveFromNNIndex(
-                flags.nnue_best_move ? chunk.best_idx : chunk.played_idx,
-                TransformForPosition(format, history));
-            float q = flags.nnue_best_score ? chunk.best_q : chunk.played_q;
-            float d = flags.nnue_best_score ? chunk.best_d : chunk.played_d;
-            out << (flags.nnue_output_sharpness
-                ? AsNnueStringDual(p, m, q, d, round(chunk.result_q))
-                : AsNnueString(p, m, q, round(chunk.result_q)));
-          } else if (i < moves.size()) {
-            out << (flags.nnue_output_sharpness
-                ? AsNnueStringDual(p, moves[i], chunk.best_q, chunk.best_d,
-                                   round(chunk.result_q))
-                : AsNnueString(p, moves[i], chunk.best_q,
-                               round(chunk.result_q)));
+          if (!flags.nnue_frc_filter || !IsFRC(p)) {
+            if (chunk.visits > 0) {
+              // Format is v6 and position is evaluated.
+              Move m = MoveFromNNIndex(
+                  flags.nnue_best_move ? chunk.best_idx : chunk.played_idx,
+                  TransformForPosition(format, history));
+              float q = flags.nnue_best_score ? chunk.best_q : chunk.played_q;
+              float d = flags.nnue_best_score ? chunk.best_d : chunk.played_d;
+              out << (flags.nnue_output_sharpness
+                          ? AsNnueStringDual(p, m, q, d, round(chunk.result_q))
+                          : AsNnueString(p, m, q, round(chunk.result_q)));
+            } else if (i < moves.size()) {
+              out << (flags.nnue_output_sharpness
+                          ? AsNnueStringDual(p, moves[i], chunk.best_q,
+                                             chunk.best_d,
+                                             round(chunk.result_q))
+                          : AsNnueString(p, moves[i], chunk.best_q,
+                                         round(chunk.result_q)));
+            }
           }
           if (i < moves.size()) {
             history.Append(moves[i]);
@@ -1269,6 +1296,7 @@ void RescoreLoop::RunLoop() {
   options_.Add<BoolOption>(kNnueBestScoreId) = true;
   options_.Add<BoolOption>(kNnueBestMoveId) = false;
   options_.Add<BoolOption>(kNnueOutputSharpnessId) = false;
+  options_.Add<BoolOption>(kNnueFrcFilterId) = true;
   options_.Add<BoolOption>(kDeleteFilesId) = true;
 
   SelfPlayTournament::PopulateOptions(&options_);
@@ -1344,6 +1372,7 @@ void RescoreLoop::RunLoop() {
   flags.nnue_best_move = options_.GetOptionsDict().Get<bool>(kNnueBestMoveId);
   flags.nnue_output_sharpness =
       options_.GetOptionsDict().Get<bool>(kNnueOutputSharpnessId);
+  flags.nnue_frc_filter = options_.GetOptionsDict().Get<bool>(kNnueFrcFilterId);
   if (threads > 1) {
     std::vector<std::thread> threads_;
     int offset = 0;
