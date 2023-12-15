@@ -27,6 +27,7 @@
 
 #include "selfplay/loop.h"
 
+#include <cmath>
 #include <optional>
 #include <sstream>
 
@@ -89,6 +90,10 @@ const OptionId kNnueBestMoveId{
     "nnue-best-move", "",
     "For the SF training data record the best move instead of the played one. "
     "If set to true the generated files do not compress well."};
+const OptionId kNnueOutputSharpnessId{
+    "nnue-output-sharpness", "",
+    "Store WDL_mu and sharpness into SF plain "
+    "training data file."};
 const OptionId kDeleteFilesId{"delete-files", "",
                               "Delete the input files after processing."};
 
@@ -437,6 +442,45 @@ int ResultForData(const V6TrainingData& data) {
   return static_cast<int>(data.result_q);
 }
 
+std::string AsNnueStringDual(const Position& p, Move m, float q, float d,
+                             int result) {
+  std::ostringstream out;
+  out << "fen " << GetFen(p) << std::endl;
+  m = p.GetBoard().GetLegacyMove(m);
+  if (m.from().row() == ChessBoard::Rank::RANK_7 &&
+      p.GetBoard().pawns().get(m.from()) &&
+      m.promotion() == Move::Promotion::None) {
+    m.SetPromotion(Move::Promotion::Knight);
+  }
+  if (p.IsBlackToMove()) m.Mirror();
+  out << "move " << m.as_string() << std::endl;
+  // Formula from PR1477 adjuster for SF PawnValueEg.
+  float w = (1.0f + q - d) / 2.0f;
+  float l = (1.0f - q - d) / 2.0f;
+  float s = 0.0f;
+  float mu_score = 0.0f;
+  if ((w > 0.001f) && (d > 0.001f) && (l > 0.001f)) {
+      float a = log(1 / l - 1);
+      float b = log(1 / w - 1);
+      s = 2 / (a + b);
+      mu_score = (a - b) / (a + b);
+    }
+  float centipawn_score = 90 * tan(1.5637541897 * q);
+  float score = mu_score != 0.0f && std::abs(q) + d < 0.996f &&
+                        (std::abs(mu_score) < 1.0f ||
+                         std::abs(centipawn_score) < std::abs(100 * mu_score))
+                    ? 100 * mu_score
+                    : centipawn_score;
+  out << "score " << round(score) << std::endl;
+  /*out << "score " << round(660.6 * q / (1 - 0.9751875 * std::pow(q, 10)))
+      << std::endl;*/
+  out << "sharpness " << round(100 * s) << std::endl;
+  out << "ply " << p.GetGamePly() << std::endl;
+  out << "result " << result << std::endl;
+  out << "e" << std::endl;
+  return out.str();
+}
+
 std::string AsNnueString(const Position& p, Move m, float q, int result) {
   std::ostringstream out;
   out << "fen " << GetFen(p) << std::endl;
@@ -461,6 +505,7 @@ struct ProcessFileFlags {
   bool delete_files : 1;
   bool nnue_best_score : 1;
   bool nnue_best_move : 1;
+  bool nnue_output_sharpness : 1;
 };
 
 void ProcessFile(const std::string& file, SyzygyTablebase* tablebase,
@@ -1079,10 +1124,16 @@ void ProcessFile(const std::string& file, SyzygyTablebase* tablebase,
                 flags.nnue_best_move ? chunk.best_idx : chunk.played_idx,
                 TransformForPosition(format, history));
             float q = flags.nnue_best_score ? chunk.best_q : chunk.played_q;
-            out << AsNnueString(p, m, q, round(chunk.result_q));
+            float d = flags.nnue_best_score ? chunk.best_d : chunk.played_d;
+            out << (flags.nnue_output_sharpness
+                ? AsNnueStringDual(p, m, q, d, round(chunk.result_q))
+                : AsNnueString(p, m, q, round(chunk.result_q)));
           } else if (i < moves.size()) {
-            out << AsNnueString(p, moves[i], chunk.best_q,
-                                round(chunk.result_q));
+            out << (flags.nnue_output_sharpness
+                ? AsNnueStringDual(p, moves[i], chunk.best_q, chunk.best_d,
+                                   round(chunk.result_q))
+                : AsNnueString(p, moves[i], chunk.best_q,
+                               round(chunk.result_q)));
           }
           if (i < moves.size()) {
             history.Append(moves[i]);
@@ -1217,6 +1268,7 @@ void RescoreLoop::RunLoop() {
   options_.Add<StringOption>(kNnuePlainFileId);
   options_.Add<BoolOption>(kNnueBestScoreId) = true;
   options_.Add<BoolOption>(kNnueBestMoveId) = false;
+  options_.Add<BoolOption>(kNnueOutputSharpnessId) = false;
   options_.Add<BoolOption>(kDeleteFilesId) = true;
 
   SelfPlayTournament::PopulateOptions(&options_);
@@ -1290,6 +1342,8 @@ void RescoreLoop::RunLoop() {
   flags.delete_files = options_.GetOptionsDict().Get<bool>(kDeleteFilesId);
   flags.nnue_best_score = options_.GetOptionsDict().Get<bool>(kNnueBestScoreId);
   flags.nnue_best_move = options_.GetOptionsDict().Get<bool>(kNnueBestMoveId);
+  flags.nnue_output_sharpness =
+      options_.GetOptionsDict().Get<bool>(kNnueOutputSharpnessId);
   if (threads > 1) {
     std::vector<std::thread> threads_;
     int offset = 0;
@@ -1314,14 +1368,13 @@ void RescoreLoop::RunLoop() {
     }
 
   } else {
-    ProcessFiles(files, &tablebase,
-                 options_.GetOptionsDict().Get<std::string>(kOutputDirId),
-                 options_.GetOptionsDict().Get<float>(kTempId),
-                 options_.GetOptionsDict().Get<float>(kDistributionOffsetId),
-                 dtz_boost,
-                 options_.GetOptionsDict().Get<int>(kNewInputFormatId), 0, 1,
-                 options_.GetOptionsDict().Get<std::string>(kNnuePlainFileId),
-                 flags);
+    ProcessFiles(
+        files, &tablebase,
+        options_.GetOptionsDict().Get<std::string>(kOutputDirId),
+        options_.GetOptionsDict().Get<float>(kTempId),
+        options_.GetOptionsDict().Get<float>(kDistributionOffsetId), dtz_boost,
+        options_.GetOptionsDict().Get<int>(kNewInputFormatId), 0, 1,
+        options_.GetOptionsDict().Get<std::string>(kNnuePlainFileId), flags);
   }
   std::cout << "Games processed: " << games << std::endl;
   std::cout << "Positions processed: " << positions << std::endl;
@@ -1439,10 +1492,9 @@ void SelfPlayLoop::SendGameInfo(const GameInfo& info) {
     res += " player1 " + std::string(*info.is_black ? "black" : "white");
   if (info.game_result != GameResult::UNDECIDED) {
     res += std::string(" result ") +
-           ((info.game_result == GameResult::DRAW)
-                ? "draw"
-                : (info.game_result == GameResult::WHITE_WON) ? "whitewon"
-                                                              : "blackwon");
+           ((info.game_result == GameResult::DRAW)        ? "draw"
+            : (info.game_result == GameResult::WHITE_WON) ? "whitewon"
+                                                          : "blackwon");
   }
   if (!info.moves.empty()) {
     res += " moves";
