@@ -298,10 +298,11 @@ class Node {
   // Also null in the solid case.
   std::unique_ptr<Node> sibling_;
 
-  // 4 byte fields.
   // Averaged draw probability. Works similarly to WL, except that D is not
   // flipped depending on the side to move.
-  float d_ = 0.0f;
+  double d_ = 0.0f;
+
+  // 4 byte fields.
   // Estimated remaining plies.
   float m_ = 0.0f;
   // How many completed visits this node had.
