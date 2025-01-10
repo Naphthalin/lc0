@@ -258,8 +258,8 @@ inline double WDLRescale(float& v, float& d, float wdl_rescale_ratio,
       return mu_new;
     } else {
       auto scale = centipawn_fallback_threshold / (std::abs(v) + d);
-      auto v_scaled = scale * v
-      auto d_scaled = scale * d
+      auto v_scaled = scale * v;
+      auto d_scaled = scale * d;
       return WDLRescale(v_scaled, d_scaled, 1.0f, 0.0f, 1.0f, true,
                         max_reasonable_s);
     }
