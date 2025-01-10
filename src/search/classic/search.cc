@@ -224,7 +224,8 @@ namespace {
 // WDL conversion formula based on random walk model.
 inline double WDLRescale(float& v, float& d, float wdl_rescale_ratio,
                          float wdl_rescale_diff, float sign, bool invert,
-                         float max_reasonable_s) {
+                         float max_reasonable_s,
+                         float centipawn_fallback_threshold = 1.0f) {
   if (invert) {
     wdl_rescale_diff = -wdl_rescale_diff;
     wdl_rescale_ratio = 1.0f / wdl_rescale_ratio;
@@ -253,7 +254,15 @@ inline double WDLRescale(float& v, float& d, float wdl_rescale_ratio,
     auto l_new = FastLogistic((-1.0f - mu_new) / s_new);
     v = w_new - l_new;
     d = std::max(0.0f, 1.0f - w_new - l_new);
-    return mu_new;
+    if (!invert || std::abs(v) + d < centipawn_fallback_threshold) {
+      return mu_new;
+    } else {
+      auto scale = centipawn_fallback_threshold / (std::abs(v) + d);
+      auto v_scaled = scale * v
+      auto d_scaled = scale * d
+      return WDLRescale(v_scaled, d_scaled, 1.0f, 0.0f, 1.0f, true,
+                        max_reasonable_s);
+    }
   }
   return 0;
 }
@@ -303,6 +312,7 @@ void Search::SendUciInfo() REQUIRES(nodes_mutex_) REQUIRES(counters_mutex_) {
     auto wl = edge.GetWL(default_wl);
     auto d = edge.GetD(default_d);
     float mu_uci = 0.0f;
+    const float centipawn_fallback_threshold = 0.99f;
     if (score_type == "WDL_mu" || (params_.GetWDLRescaleDiff() != 0.0f &&
                                    contempt_mode_ != ContemptMode::NONE)) {
       auto sign = ((contempt_mode_ == ContemptMode::BLACK) ==
@@ -314,7 +324,7 @@ void Search::SendUciInfo() REQUIRES(nodes_mutex_) REQUIRES(counters_mutex_) {
           contempt_mode_ == ContemptMode::NONE
               ? 0
               : params_.GetWDLRescaleDiff() * params_.GetWDLEvalObjectivity(),
-          sign, true, params_.GetWDLMaxS());
+          sign, true, params_.GetWDLMaxS(), centipawn_fallback_threshold);
     }
     const auto q = edge.GetQ(default_q, draw_score);
     if (edge.IsTerminal() && wl != 0.0f) {
@@ -338,11 +348,10 @@ void Search::SendUciInfo() REQUIRES(nodes_mutex_) REQUIRES(counters_mutex_) {
     } else if (score_type == "WDL_mu") {
       // Reports the WDL mu value whenever it is reasonable, and defaults to
       // centipawn otherwise.
-      const float centipawn_fallback_threshold = 0.996f;
+
       float centipawn_score = 45 * tan(1.56728071628 * wl);
       uci_info.score =
           network_->GetCapabilities().has_wdl() && mu_uci != 0.0f &&
-                  std::abs(wl) + d < centipawn_fallback_threshold &&
                   (std::abs(mu_uci) < 1.0f ||
                    std::abs(centipawn_score) < std::abs(100 * mu_uci))
               ? 100 * mu_uci
