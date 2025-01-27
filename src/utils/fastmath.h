@@ -85,6 +85,11 @@ inline float FastLog(const float a) {
 // Fast approximate exp(x). Does only limited range checking.
 inline float FastExp(const float a) { return FastExp2(1.442695040f * a); }
 
+// Fast approximate pow(a,b). No range checking beyond exp2, log2.
+inline float FastPow(const float a, const float b) {
+  return FastExp2(b * FastLog2(a));
+}
+
 // Safeguarded fast logistic function, based on FastExp().
 inline float FastLogistic(const float a) {
   if (a > 20.0f) {return 1.0f;}
