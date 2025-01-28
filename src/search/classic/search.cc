@@ -1732,7 +1732,7 @@ void SearchWorker::PickNodesToExtendTask(
           GetFpu(params_, node, is_root_node, draw_score, visited_pol);
       for (int i = 0; i < max_needed; i++) {
         if (current_util[i] == std::numeric_limits<float>::lowest()) {
-          float delta_q = current_pol[i] > 0 ? 0.03f * (0.1 * FastPow(current_pol[i], -1.45) +
+          float delta_q = current_pol[i] > 0 ? 0.03f * (0.005f * FastPow(current_pol[i], -1.45) +
                                           0.9 * FastPow(current_pol[i], -0.45)) : 0.0f;
           current_util[i] = fpu - delta_q + m_evaluator.GetDefaultMUtility();
         }
