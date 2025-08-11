@@ -447,9 +447,23 @@ int ResultForData(const V6TrainingData& data) {
 }
 
 std::string AsNnueStringDual(const Position& p, Move m, float q, float d,
-                             int result) {
+                             int result, bool fix_frc) {
   std::ostringstream out;
-  out << "fen " << GetFen(p) << std::endl;
+  auto fen = GetFen(p);
+  if (fix_frc && !p.GetBoard().castlings().no_legal_castle()) {
+    auto pos = fen.find_first_of("aAhH");
+    if (pos != std::string::npos) {
+      // Castling rights will only be a, A, h, H, aA or hH;
+      for (auto i = 0; i < 2; i++) {
+        if (isdigit(fen[pos + i + 1])) break;
+        if (fen[pos + i] == 'a') fen[pos + i] = 'q';
+        if (fen[pos + i] == 'A') fen[pos + i] = 'Q';
+        if (fen[pos + i] == 'h') fen[pos + i] = 'k';
+        if (fen[pos + i] == 'H') fen[pos + i] = 'K';
+      }
+    }
+  }
+  out << "fen " << fen << std::endl;
   m = p.GetBoard().GetLegacyMove(m);
   if (m.from().row() == ChessBoard::Rank::RANK_7 &&
       p.GetBoard().pawns().get(m.from()) &&
@@ -475,10 +489,10 @@ std::string AsNnueStringDual(const Position& p, Move m, float q, float d,
                          std::abs(centipawn_score) < std::abs(100 * mu_score))
                     ? 100 * mu_score
                     : centipawn_score;
-  out << "score " << round(score) << std::endl;
+  out << "score " << (int)round(score) << std::endl;
   /*out << "score " << round(660.6 * q / (1 - 0.9751875 * std::pow(q, 10)))
       << std::endl;*/
-  out << "sharpness " << round(100 * s) << std::endl;
+  out << "sharpness " << (int)round(100 * s) << std::endl;
   out << "ply " << p.GetGamePly() << std::endl;
   out << "result " << result << std::endl;
   out << "e" << std::endl;
@@ -504,9 +518,24 @@ bool IsFRC(Position p) {
   return false;
 }
 
-std::string AsNnueString(const Position& p, Move m, float q, int result) {
+std::string AsNnueString(const Position& p, Move m, float q, int result,
+                         bool fix_frc) {
   std::ostringstream out;
-  out << "fen " << GetFen(p) << std::endl;
+  auto fen = GetFen(p);
+  if (fix_frc && !p.GetBoard().castlings().no_legal_castle()) {
+    auto pos = fen.find_first_of("aAhH");
+    if (pos != std::string::npos) {
+      // Castling rights will only be a, A, h, H, aA or hH;
+      for (auto i = 0; i < 2; i++) {
+        if (isdigit(fen[pos + i + 1])) break;
+        if (fen[pos + i] == 'a') fen[pos + i] = 'q';
+        if (fen[pos + i] == 'A') fen[pos + i] = 'Q';
+        if (fen[pos + i] == 'h') fen[pos + i] = 'k';
+        if (fen[pos + i] == 'H') fen[pos + i] = 'K';
+      }
+    }
+  }
+  out << "fen " << fen << std::endl;
   m = p.GetBoard().GetLegacyMove(m);
   if (m.from().row() == ChessBoard::Rank::RANK_7 &&
       p.GetBoard().pawns().get(m.from()) &&
@@ -516,7 +545,7 @@ std::string AsNnueString(const Position& p, Move m, float q, int result) {
   if (p.IsBlackToMove()) m.Mirror();
   out << "move " << m.as_string() << std::endl;
   // Formula from PR1477 adjuster for SF PawnValueEg.
-  out << "score " << round(660.6 * q / (1 - 0.9751875 * std::pow(q, 10)))
+  out << "score " << (int)round(660.6 * q / (1 - 0.9751875 * std::pow(q, 10)))
       << std::endl;
   out << "ply " << p.GetGamePly() << std::endl;
   out << "result " << result << std::endl;
@@ -1151,15 +1180,18 @@ void ProcessFile(const std::string& file, SyzygyTablebase* tablebase,
               float q = flags.nnue_best_score ? chunk.best_q : chunk.played_q;
               float d = flags.nnue_best_score ? chunk.best_d : chunk.played_d;
               out << (flags.nnue_output_sharpness
-                          ? AsNnueStringDual(p, m, q, d, round(chunk.result_q))
-                          : AsNnueString(p, m, q, round(chunk.result_q)));
+                          ? AsNnueStringDual(p, m, q, d, round(chunk.result_q),
+                                             flags.nnue_frc_filter)
+                          : AsNnueString(p, m, q, round(chunk.result_q),
+                                         flags.nnue_frc_filter));
             } else if (i < moves.size()) {
               out << (flags.nnue_output_sharpness
-                          ? AsNnueStringDual(p, moves[i], chunk.best_q,
-                                             chunk.best_d,
-                                             round(chunk.result_q))
+                          ? AsNnueStringDual(
+                                p, moves[i], chunk.best_q, chunk.best_d,
+                                round(chunk.result_q), flags.nnue_frc_filter)
                           : AsNnueString(p, moves[i], chunk.best_q,
-                                         round(chunk.result_q)));
+                                         round(chunk.result_q),
+                                         flags.nnue_frc_filter));
             }
           }
           if (i < moves.size()) {
